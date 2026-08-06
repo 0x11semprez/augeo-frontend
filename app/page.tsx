@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 type Prestation = { Code: string; Libelle: string; PrixTTC: number };
 type Operateur = { nom: string; email: string; telephone: string };
@@ -55,6 +55,11 @@ const todayFR = () => {
   const dd = String(now.getDate()).padStart(2, "0");
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   return `${dd}/${mm}/${now.getFullYear()}`;
+};
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const todayISO = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
 };
 
 export default function Home() {
@@ -298,7 +303,6 @@ export default function Home() {
         <div className="content">
           <div className="page-intro">
             <div>
-              <p className="eyebrow">DEVIS</p>
               <h1>Créer un nouveau devis</h1>
               <p>
                 Renseignez les informations nécessaires, puis générez le
@@ -350,16 +354,18 @@ export default function Home() {
                   />
                 </Field>
                 <Field label="Date de naissance">
-                  <FrenchDateInput
+                  <DatePicker
                     value={data.dateNaissance}
+                    max={todayISO()}
                     onValueChange={(value) =>
                       updateField("dateNaissance", value)
                     }
                   />
                 </Field>
                 <Field label="Date de décès">
-                  <FrenchDateInput
+                  <DatePicker
                     value={data.dateDeces}
+                    max={todayISO()}
                     onValueChange={(value) => updateField("dateDeces", value)}
                   />
                 </Field>
@@ -367,6 +373,13 @@ export default function Home() {
                   <FrenchTimeInput
                     value={data.heureDeces}
                     onValueChange={(value) => updateField("heureDeces", value)}
+                  />
+                </Field>
+                <Field label="Code postal">
+                  <input
+                    inputMode="numeric"
+                    value={data.codePostal}
+                    onChange={(e) => updateField("codePostal", e.target.value)}
                   />
                 </Field>
                 <Field label="Ville du décès">
@@ -380,13 +393,6 @@ export default function Home() {
                       <option key={ville} value={ville} />
                     ))}
                   </datalist>
-                </Field>
-                <Field label="Code postal">
-                  <input
-                    inputMode="numeric"
-                    value={data.codePostal}
-                    onChange={(e) => updateField("codePostal", e.target.value)}
-                  />
                 </Field>
               </div>
               <div className="subsection-label">
@@ -432,7 +438,7 @@ export default function Home() {
               />
               <div className="form-grid">
                 <Field label="Date d’admission">
-                  <FrenchDateInput
+                  <DatePicker
                     value={data.dateAdmission}
                     onValueChange={(value) =>
                       updateField("dateAdmission", value)
@@ -448,7 +454,7 @@ export default function Home() {
                   />
                 </Field>
                 <Field label="Date de départ">
-                  <FrenchDateInput
+                  <DatePicker
                     key={data.dateDepart}
                     value={data.dateDepart}
                     min={data.dateAdmission}
@@ -602,65 +608,6 @@ function autoFormatTimeInput(rawValue: string) {
   return formatted;
 }
 
-function FrenchDateInput({
-  value,
-  min,
-  onValueChange,
-}: {
-  value: string;
-  min?: string;
-  onValueChange: (value: string) => void;
-}) {
-  const [text, setText] = useState(formatFrenchDate(value));
-
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    event.currentTarget.setCustomValidity("");
-    const formatted = autoFormatDateInput(event.target.value, text);
-    setText(formatted);
-    // Validates and propagates as soon as the date is complete (DD/MM/YYYY)
-    if (formatted.length === 10) {
-      const parsed = parseFrenchDate(formatted);
-      const isValid = Boolean(parsed && (!min || parsed >= min));
-      event.currentTarget.setCustomValidity(
-        isValid
-          ? ""
-          : min && parsed
-            ? "La date de départ ne peut pas précéder l’admission."
-            : "Date invalide.",
-      );
-      if (isValid) onValueChange(parsed);
-    } else if (formatted.length === 0) {
-      onValueChange("");
-    }
-  };
-
-  const commit = (event: React.FocusEvent<HTMLInputElement>) => {
-    const parsed = parseFrenchDate(text);
-    const isValid = !text || Boolean(parsed && (!min || parsed >= min));
-    event.currentTarget.setCustomValidity(
-      isValid
-        ? ""
-        : min && parsed
-          ? "La date de départ ne peut pas précéder l’admission."
-          : "Utilisez le format JJ/MM/AAAA.",
-    );
-    if (isValid) onValueChange(parsed);
-  };
-
-  return (
-    <input
-      type="text"
-      inputMode="numeric"
-      autoComplete="off"
-      placeholder="JJ/MM/AAAA"
-      maxLength={10}
-      value={text}
-      onChange={handleChange}
-      onBlur={commit}
-    />
-  );
-}
-
 function FrenchTimeInput({
   value,
   min,
@@ -725,6 +672,211 @@ function FrenchTimeInput({
       onChange={handleChange}
       onBlur={commit}
     />
+  );
+}
+
+const WEEKDAY_LABELS = ["L", "M", "M", "J", "V", "S", "D"];
+const MONTH_LABELS = [
+  "Janvier",
+  "Février",
+  "Mars",
+  "Avril",
+  "Mai",
+  "Juin",
+  "Juillet",
+  "Août",
+  "Septembre",
+  "Octobre",
+  "Novembre",
+  "Décembre",
+];
+
+function toISODate(date: Date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+// Builds a 6-week grid (Monday-first) covering the given month.
+function buildCalendarDays(viewYear: number, viewMonth: number) {
+  const firstOfMonth = new Date(viewYear, viewMonth, 1);
+  const mondayOffset = (firstOfMonth.getDay() + 6) % 7;
+  const gridStart = new Date(viewYear, viewMonth, 1 - mondayOffset);
+  return Array.from({ length: 42 }, (_, i) => {
+    const date = new Date(
+      gridStart.getFullYear(),
+      gridStart.getMonth(),
+      gridStart.getDate() + i,
+    );
+    return { date, inMonth: date.getMonth() === viewMonth };
+  });
+}
+
+function DatePicker({
+  value,
+  min,
+  max,
+  onValueChange,
+}: {
+  value: string;
+  min?: string;
+  max?: string;
+  onValueChange: (value: string) => void;
+}) {
+  const [text, setText] = useState(formatFrenchDate(value));
+  const [open, setOpen] = useState(false);
+  const initialView = value ? new Date(value + "T00:00:00") : new Date();
+  const [viewYear, setViewYear] = useState(initialView.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initialView.getMonth());
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    event.currentTarget.setCustomValidity("");
+    const formatted = autoFormatDateInput(event.target.value, text);
+    setText(formatted);
+    if (formatted.length === 10) {
+      const parsed = parseFrenchDate(formatted);
+      const isValid = Boolean(
+        parsed && (!min || parsed >= min) && (!max || parsed <= max),
+      );
+      event.currentTarget.setCustomValidity(isValid ? "" : "Date invalide.");
+      if (isValid) onValueChange(parsed);
+    } else if (formatted.length === 0) {
+      onValueChange("");
+    }
+  };
+
+  const commit = (event: React.FocusEvent<HTMLInputElement>) => {
+    const parsed = parseFrenchDate(text);
+    const isValid = Boolean(
+      !text || (parsed && (!min || parsed >= min) && (!max || parsed <= max)),
+    );
+    event.currentTarget.setCustomValidity(
+      isValid ? "" : "Utilisez le format JJ/MM/AAAA.",
+    );
+    if (isValid) onValueChange(parsed);
+  };
+
+  const openCalendar = () => {
+    const base = value ? new Date(value + "T00:00:00") : new Date();
+    setViewYear(base.getFullYear());
+    setViewMonth(base.getMonth());
+    setOpen((current) => !current);
+  };
+
+  const changeMonth = (delta: number) => {
+    const next = new Date(viewYear, viewMonth + delta, 1);
+    setViewYear(next.getFullYear());
+    setViewMonth(next.getMonth());
+  };
+
+  const pickDate = (date: Date) => {
+    const iso = toISODate(date);
+    setText(formatFrenchDate(iso));
+    onValueChange(iso);
+    setOpen(false);
+  };
+
+  const days = buildCalendarDays(viewYear, viewMonth);
+  const todayIso = todayISO();
+
+  return (
+    <div className="date-picker" ref={containerRef}>
+      <div className="date-picker-input-row">
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="JJ/MM/AAAA"
+          maxLength={10}
+          value={text}
+          onChange={handleChange}
+          onBlur={commit}
+        />
+        <button
+          type="button"
+          className="date-picker-toggle"
+          onClick={openCalendar}
+          aria-label="Ouvrir le calendrier"
+        >
+          <CalendarIcon />
+        </button>
+      </div>
+      {open && (
+        <div className="date-picker-popover">
+          <div className="date-picker-header">
+            <button type="button" onClick={() => changeMonth(-1)} aria-label="Mois précédent">
+              ‹
+            </button>
+            <span>
+              {MONTH_LABELS[viewMonth]} {viewYear}
+            </span>
+            <button type="button" onClick={() => changeMonth(1)} aria-label="Mois suivant">
+              ›
+            </button>
+          </div>
+          <div className="date-picker-weekdays">
+            {WEEKDAY_LABELS.map((label, i) => (
+              <span key={i}>{label}</span>
+            ))}
+          </div>
+          <div className="date-picker-days">
+            {days.map(({ date, inMonth }) => {
+              const iso = toISODate(date);
+              const disabled = Boolean((min && iso < min) || (max && iso > max));
+              const classNames = [
+                !inMonth && "outside",
+                iso === value && "selected",
+                iso === todayIso && "today",
+              ]
+                .filter(Boolean)
+                .join(" ");
+              return (
+                <button
+                  type="button"
+                  key={iso}
+                  className={classNames}
+                  disabled={disabled}
+                  onClick={() => pickDate(date)}
+                >
+                  {date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M8 3v4" />
+      <path d="M16 3v4" />
+    </svg>
   );
 }
 
