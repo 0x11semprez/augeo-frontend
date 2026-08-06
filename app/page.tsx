@@ -138,6 +138,13 @@ export default function Home() {
     setData((current) => {
       const next = { ...current, [field]: value };
       if (
+        field === "dateNaissance" &&
+        next.dateNaissance &&
+        next.dateDeces &&
+        next.dateDeces < next.dateNaissance
+      )
+        next.dateDeces = next.dateNaissance;
+      if (
         (field === "dateAdmission" || field === "heureAdmission") &&
         next.dateAdmission &&
         next.dateDepart &&
@@ -180,8 +187,8 @@ export default function Home() {
     const body = encodeURIComponent(
       "Bonjour,\n\nVeuillez trouver le devis en pièce jointe.\n\nCordialement,",
     );
-    const to = selectedOperateur?.email ?? "";
-    window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+    const to = encodeURIComponent(selectedOperateur?.email ?? "");
+    window.open(`mailto:${to}?subject=${subject}&body=${body}`, "_blank");
     setStatus({
       type: "success",
       message: selectedOperateur?.email
@@ -262,7 +269,10 @@ export default function Home() {
         throw new Error(payload?.error ?? "La génération du devis a échoué.");
       }
       const blob = await response.blob();
-      if (pdfWindow) pdfWindow.location.href = URL.createObjectURL(blob);
+      const blobUrl = URL.createObjectURL(blob);
+      if (pdfWindow) pdfWindow.location.href = blobUrl;
+      // Revoke once the new tab has had time to load the PDF, to avoid leaking the blob.
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
       setStatus({
         type: "success",
         message: "Le devis a été généré et ouvert dans une nouvelle fenêtre.",
@@ -353,8 +363,9 @@ export default function Home() {
                     placeholder="Facultatif"
                   />
                 </Field>
-                <Field label="Date de naissance">
+                <Field label="Date de naissance" as="div">
                   <DatePicker
+                    label="Date de naissance"
                     value={data.dateNaissance}
                     max={todayISO()}
                     onValueChange={(value) =>
@@ -362,10 +373,15 @@ export default function Home() {
                     }
                   />
                 </Field>
-                <Field label="Date de décès">
+                <Field label="Date de décès" as="div">
                   <DatePicker
+                    key={data.dateDeces}
+                    label="Date de décès"
                     value={data.dateDeces}
+                    min={data.dateNaissance}
+                    minMessage="La date de décès ne peut pas précéder la naissance."
                     max={todayISO()}
+                    maxMessage="La date de décès ne peut pas être dans le futur."
                     onValueChange={(value) => updateField("dateDeces", value)}
                   />
                 </Field>
@@ -437,8 +453,9 @@ export default function Home() {
                 subtitle="Dates de prise en charge et coordonnées"
               />
               <div className="form-grid">
-                <Field label="Date d’admission">
+                <Field label="Date d’admission" as="div">
                   <DatePicker
+                    label="Date d’admission"
                     value={data.dateAdmission}
                     onValueChange={(value) =>
                       updateField("dateAdmission", value)
@@ -453,11 +470,13 @@ export default function Home() {
                     }
                   />
                 </Field>
-                <Field label="Date de départ">
+                <Field label="Date de départ" as="div">
                   <DatePicker
                     key={data.dateDepart}
+                    label="Date de départ"
                     value={data.dateDepart}
                     min={data.dateAdmission}
+                    minMessage="La date de départ ne peut pas précéder l’admission."
                     onValueChange={(value) => updateField("dateDepart", value)}
                   />
                 </Field>
@@ -714,11 +733,17 @@ function DatePicker({
   value,
   min,
   max,
+  minMessage,
+  maxMessage,
+  label,
   onValueChange,
 }: {
   value: string;
   min?: string;
   max?: string;
+  minMessage?: string;
+  maxMessage?: string;
+  label: string;
   onValueChange: (value: string) => void;
 }) {
   const [text, setText] = useState(formatFrenchDate(value));
@@ -727,6 +752,7 @@ function DatePicker({
   const [viewYear, setViewYear] = useState(initialView.getFullYear());
   const [viewMonth, setViewMonth] = useState(initialView.getMonth());
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -735,9 +761,27 @@ function DatePicker({
         setOpen(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        inputRef.current?.focus();
+      }
+    };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [open]);
+
+  // Returns "" when parsed satisfies min/max, otherwise the message to show.
+  const validityMessage = (parsed: string) => {
+    if (!parsed) return "Date invalide.";
+    if (min && parsed < min) return minMessage ?? "Cette date est trop ancienne.";
+    if (max && parsed > max) return maxMessage ?? "Cette date est trop récente.";
+    return "";
+  };
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     event.currentTarget.setCustomValidity("");
@@ -745,25 +789,25 @@ function DatePicker({
     setText(formatted);
     if (formatted.length === 10) {
       const parsed = parseFrenchDate(formatted);
-      const isValid = Boolean(
-        parsed && (!min || parsed >= min) && (!max || parsed <= max),
-      );
-      event.currentTarget.setCustomValidity(isValid ? "" : "Date invalide.");
-      if (isValid) onValueChange(parsed);
+      const message = validityMessage(parsed);
+      event.currentTarget.setCustomValidity(message);
+      if (!message) onValueChange(parsed);
     } else if (formatted.length === 0) {
       onValueChange("");
     }
   };
 
   const commit = (event: React.FocusEvent<HTMLInputElement>) => {
+    if (!text) {
+      event.currentTarget.setCustomValidity("");
+      return;
+    }
     const parsed = parseFrenchDate(text);
-    const isValid = Boolean(
-      !text || (parsed && (!min || parsed >= min) && (!max || parsed <= max)),
-    );
-    event.currentTarget.setCustomValidity(
-      isValid ? "" : "Utilisez le format JJ/MM/AAAA.",
-    );
-    if (isValid) onValueChange(parsed);
+    const message = parsed
+      ? validityMessage(parsed)
+      : "Utilisez le format JJ/MM/AAAA.";
+    event.currentTarget.setCustomValidity(message);
+    if (!message) onValueChange(parsed);
   };
 
   const openCalendar = () => {
@@ -782,8 +826,11 @@ function DatePicker({
   const pickDate = (date: Date) => {
     const iso = toISODate(date);
     setText(formatFrenchDate(iso));
+    // Clears any stale validity left over from an earlier invalid keystroke.
+    inputRef.current?.setCustomValidity("");
     onValueChange(iso);
     setOpen(false);
+    inputRef.current?.focus();
   };
 
   const days = buildCalendarDays(viewYear, viewMonth);
@@ -793,11 +840,13 @@ function DatePicker({
     <div className="date-picker" ref={containerRef}>
       <div className="date-picker-input-row">
         <input
+          ref={inputRef}
           type="text"
           inputMode="numeric"
           autoComplete="off"
           placeholder="JJ/MM/AAAA"
           maxLength={10}
+          aria-label={label}
           value={text}
           onChange={handleChange}
           onBlur={commit}
@@ -806,13 +855,17 @@ function DatePicker({
           type="button"
           className="date-picker-toggle"
           onClick={openCalendar}
-          aria-label="Ouvrir le calendrier"
+          aria-label={`Ouvrir le calendrier — ${label}`}
         >
           <CalendarIcon />
         </button>
       </div>
       {open && (
-        <div className="date-picker-popover">
+        <div
+          className="date-picker-popover"
+          role="dialog"
+          aria-label={`Calendrier — ${label}`}
+        >
           <div className="date-picker-header">
             <button type="button" onClick={() => changeMonth(-1)} aria-label="Mois précédent">
               ‹
@@ -825,8 +878,8 @@ function DatePicker({
             </button>
           </div>
           <div className="date-picker-weekdays">
-            {WEEKDAY_LABELS.map((label, i) => (
-              <span key={i}>{label}</span>
+            {WEEKDAY_LABELS.map((day, i) => (
+              <span key={i}>{day}</span>
             ))}
           </div>
           <div className="date-picker-days">
@@ -846,6 +899,13 @@ function DatePicker({
                   key={iso}
                   className={classNames}
                   disabled={disabled}
+                  aria-current={iso === todayIso ? "date" : undefined}
+                  aria-pressed={iso === value}
+                  aria-label={date.toLocaleDateString("fr-FR", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
                   onClick={() => pickDate(date)}
                 >
                   {date.getDate()}
@@ -913,20 +973,23 @@ function Field({
   label,
   required,
   className,
+  as = "label",
   children,
 }: {
   label: string;
   required?: boolean;
   className?: string;
+  as?: "label" | "div";
   children: React.ReactNode;
 }) {
+  const Tag = as;
   return (
-    <label className={`field ${className ?? ""}`}>
+    <Tag className={`field ${className ?? ""}`}>
       <span>
         {label}
         {required && <b>*</b>}
       </span>
       {children}
-    </label>
+    </Tag>
   );
 }
