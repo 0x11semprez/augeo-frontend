@@ -76,6 +76,7 @@ export default function Home() {
     message: string;
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     async function loadPrestations() {
@@ -296,6 +297,13 @@ export default function Home() {
     await generateDevis();
   }
 
+  function handleNouveauDevis() {
+    setData(initialData);
+    setSelectedPrestations({});
+    setStatus(null);
+    setFormKey((current) => current + 1);
+  }
+
   const selectedCount =
     Object.values(selectedPrestations).filter(Boolean).length;
   return (
@@ -320,7 +328,7 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} key={formKey}>
             <section className="form-card">
               <Heading
                 title="Informations du défunt"
@@ -552,6 +560,15 @@ export default function Home() {
             <div className="submit-bar">
               <p>Le devis sera généré au format PDF.</p>
               <div className="form-actions">
+                {status?.type === "success" && (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={handleNouveauDevis}
+                  >
+                    Nouveau devis
+                  </button>
+                )}
                 <button
                   className="secondary-button"
                   type="button"
