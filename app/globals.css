@@ -409,7 +409,7 @@ select {
 }
 .submit-bar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   padding: 8px 0;
 }
@@ -433,23 +433,37 @@ select {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 .secondary-button:hover {
-  background: #f6f7fa;
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
 }
 .generate-button {
   display: inline-flex;
   align-items: center;
-  border: 0;
+  border: 1px solid #dce1e9;
   border-radius: 7px;
-  background: var(--navy);
-  color: #fff;
+  background: #fff;
+  color: #405069;
   min-height: 52px;
   padding: 0 22px;
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
-  box-shadow: 0 7px 14px rgba(22, 38, 62, 0.14);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.generate-button:hover:not(:disabled) {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
 }
 .generate-button svg {
   margin-left: 19px;
