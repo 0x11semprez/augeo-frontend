@@ -8,7 +8,7 @@ type Operateur = { nom: string; email: string; telephone: string };
 type FormData = {
   civilite: string;
   nom: string;
-  nomJeuneFille: string;
+  nomNaissance: string;
   prenom: string;
   dateNaissance: string;
   dateDeces: string;
@@ -24,12 +24,15 @@ type FormData = {
   dateDepart: string;
   heureDepart: string;
   operateur: string;
+  paiementChequeDepart: boolean;
+  tresGrand: boolean;
+  arriveeNuit: boolean;
 };
 
 const initialData: FormData = {
   civilite: "M",
   nom: "",
-  nomJeuneFille: "",
+  nomNaissance: "",
   prenom: "",
   dateNaissance: "",
   dateDeces: "",
@@ -45,6 +48,9 @@ const initialData: FormData = {
   dateDepart: "",
   heureDepart: "",
   operateur: "",
+  paiementChequeDepart: false,
+  tresGrand: false,
+  arriveeNuit: false,
 };
 const apiUrl = process.env.NEXT_PUBLIC_DEVIS_API_URL ?? "http://localhost:8080";
 const formatDate = (value: string) =>
@@ -362,11 +368,11 @@ export default function Home() {
                     required
                   />
                 </Field>
-                <Field label="Nom de jeune fille">
+                <Field label="Nom de naissance">
                   <input
-                    value={data.nomJeuneFille}
+                    value={data.nomNaissance}
                     onChange={(e) =>
-                      updateField("nomJeuneFille", e.target.value)
+                      updateField("nomNaissance", e.target.value)
                     }
                     placeholder="Facultatif"
                   />
@@ -508,6 +514,52 @@ export default function Home() {
                       <option key={i} value={o.nom} />
                     ))}
                   </datalist>
+                </Field>
+                <Field label="Mentions particulières" as="div" className="span-2">
+                  <div className="mentions-list">
+                    <label className="mention-item">
+                      <input
+                        className="prestation-checkbox"
+                        type="checkbox"
+                        checked={data.paiementChequeDepart}
+                        onChange={(e) =>
+                          setData((current) => ({
+                            ...current,
+                            paiementChequeDepart: e.target.checked,
+                          }))
+                        }
+                      />
+                      Paiement par chèque au départ
+                    </label>
+                    <label className="mention-item">
+                      <input
+                        className="prestation-checkbox"
+                        type="checkbox"
+                        checked={data.tresGrand}
+                        onChange={(e) =>
+                          setData((current) => ({
+                            ...current,
+                            tresGrand: e.target.checked,
+                          }))
+                        }
+                      />
+                      Très grand
+                    </label>
+                    <label className="mention-item">
+                      <input
+                        className="prestation-checkbox"
+                        type="checkbox"
+                        checked={data.arriveeNuit}
+                        onChange={(e) =>
+                          setData((current) => ({
+                            ...current,
+                            arriveeNuit: e.target.checked,
+                          }))
+                        }
+                      />
+                      Arrivée de nuit
+                    </label>
+                  </div>
                 </Field>
               </div>
             </section>
