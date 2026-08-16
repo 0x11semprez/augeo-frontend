@@ -686,7 +686,6 @@ export default function Home() {
               </div>
             )}
             <div className="submit-bar">
-              <p>Le devis sera généré au format PDF.</p>
               <div className="form-actions">
                 {status?.type === "success" && (
                   <button
