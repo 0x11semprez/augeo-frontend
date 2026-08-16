@@ -83,6 +83,13 @@ export default function Home() {
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  const [christopheMode, setChristopheMode] = useState(false);
+  const [activeRubrique, setActiveRubrique] = useState(0);
+  const rubriqueLabels = [
+    "Informations du défunt",
+    "Séjour & opérateur",
+    "Prestations",
+  ];
 
   useEffect(() => {
     async function loadPrestations() {
@@ -188,19 +195,21 @@ export default function Home() {
     (o) => o.nom.trim().toLowerCase() === normalizedOperateur,
   );
 
-  // mailto: instead of Outlook Web's compose deeplink, which is buggy.
   const handleOuvrirOutlook = () => {
     const subject = encodeURIComponent(buildDevisLabel());
     const body = encodeURIComponent(
       "Bonjour,\n\nVeuillez trouver le devis en pièce jointe.\n\nCordialement,",
     );
     const to = encodeURIComponent(selectedOperateur?.email ?? "");
-    window.open(`mailto:${to}?subject=${subject}&body=${body}`, "_blank");
+    window.open(
+      `https://outlook.office.com/mail/deeplink/compose?to=${to}&subject=${subject}&body=${body}`,
+      "_blank",
+    );
     setStatus({
       type: "success",
       message: selectedOperateur?.email
-        ? `Votre application mail s’est ouverte avec un nouveau message adressé à ${selectedOperateur.email}.`
-        : "Votre application mail s’est ouverte avec un nouveau message. Sélectionnez une pompe funèbre pour pré-remplir le destinataire.",
+        ? `Outlook Web s’est ouvert avec un nouveau message adressé à ${selectedOperateur.email}.`
+        : "Outlook Web s’est ouvert avec un nouveau message. Sélectionnez une pompe funèbre pour pré-remplir le destinataire.",
     });
   };
 
@@ -313,7 +322,7 @@ export default function Home() {
   const selectedCount =
     Object.values(selectedPrestations).filter(Boolean).length;
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${christopheMode ? "christophe-mode" : ""}`}>
       <header className="site-header">
         <Image
           src="/ogf-logo-black.png"
@@ -333,277 +342,344 @@ export default function Home() {
                 document PDF.
               </p>
             </div>
+            <button
+              type="button"
+              className={`christophe-toggle ${christopheMode ? "active" : ""}`}
+              aria-pressed={christopheMode}
+              onClick={() => setChristopheMode((current) => !current)}
+            >
+              👁 Mode Christophe
+            </button>
           </div>
           <form onSubmit={handleSubmit} key={formKey}>
-            <section className="form-card">
-              <Heading
-                title="Informations du défunt"
-                subtitle="Identité, décès et mensurations"
-              />
-              <div className="form-grid">
-                <Field label="Civilité">
-                  <select
-                    value={data.civilite}
-                    onChange={(e) => updateField("civilite", e.target.value)}
-                  >
-                    <option>M</option>
-                    <option>Mme</option>
-                  </select>
-                </Field>
-                <Field label="Nom" required>
-                  <input
-                    value={data.nom}
-                    onChange={(e) =>
-                      updateField("nom", e.target.value.toUpperCase())
-                    }
-                    placeholder="DUPONT"
-                    required
-                  />
-                </Field>
-                <Field label="Prénom" required>
-                  <input
-                    value={data.prenom}
-                    onChange={(e) => updateField("prenom", e.target.value)}
-                    placeholder="Jean"
-                    required
-                  />
-                </Field>
-                <Field label="Nom de naissance">
-                  <input
-                    value={data.nomNaissance}
-                    onChange={(e) =>
-                      updateField("nomNaissance", e.target.value)
-                    }
-                    placeholder="Facultatif"
-                  />
-                </Field>
-                <Field label="Date de naissance" as="div">
-                  <DatePicker
-                    label="Date de naissance"
-                    value={data.dateNaissance}
-                    max={todayISO()}
-                    onValueChange={(value) =>
-                      updateField("dateNaissance", value)
-                    }
-                  />
-                </Field>
-                <Field label="Date de décès" as="div">
-                  <DatePicker
-                    key={data.dateDeces}
-                    label="Date de décès"
-                    value={data.dateDeces}
-                    min={data.dateNaissance}
-                    minMessage="La date de décès ne peut pas précéder la naissance."
-                    max={todayISO()}
-                    maxMessage="La date de décès ne peut pas être dans le futur."
-                    onValueChange={(value) => updateField("dateDeces", value)}
-                  />
-                </Field>
-                <Field label="Heure de décès">
-                  <FrenchTimeInput
-                    value={data.heureDeces}
-                    onValueChange={(value) => updateField("heureDeces", value)}
-                  />
-                </Field>
-                <Field label="Code postal">
-                  <input
-                    inputMode="numeric"
-                    value={data.codePostal}
-                    onChange={(e) => updateField("codePostal", e.target.value)}
-                  />
-                </Field>
-                <Field label="Ville du décès">
-                  <input
-                    list="villes-options"
-                    value={data.villeDeces}
-                    onChange={(e) => updateField("villeDeces", e.target.value)}
-                  />
-                  <datalist id="villes-options">
-                    {villeSuggestions.map((ville) => (
-                      <option key={ville} value={ville} />
-                    ))}
-                  </datalist>
-                </Field>
-              </div>
-              <div className="subsection-label">
-                Mensurations <span>Ces informations sont facultatives.</span>
-              </div>
-              <div className="form-grid measurement-grid">
-                <Field label="Taille (cm)">
-                  <input
-                    inputMode="numeric"
-                    value={data.tailleDefunt}
-                    onChange={(e) =>
-                      updateField("tailleDefunt", e.target.value)
-                    }
-                  />
-                </Field>
-                <Field label="Épaulement (cm)">
-                  <input
-                    inputMode="numeric"
-                    value={data.epaulement}
-                    onChange={(e) => updateField("epaulement", e.target.value)}
-                  />
-                </Field>
-                <Field label="Coude à coude (cm)">
-                  <input
-                    inputMode="numeric"
-                    value={data.coudeACoude}
-                    onChange={(e) => updateField("coudeACoude", e.target.value)}
-                  />
-                </Field>
-                <Field label="Épaisseur (cm)">
-                  <input
-                    inputMode="numeric"
-                    value={data.epaisseur}
-                    onChange={(e) => updateField("epaisseur", e.target.value)}
-                  />
-                </Field>
-              </div>
-            </section>
-            <section className="form-card">
-              <Heading
-                title="Séjour & opérateur"
-                subtitle="Dates de prise en charge et coordonnées"
-              />
-              <div className="form-grid">
-                <Field label="Date d’admission" as="div">
-                  <DatePicker
-                    label="Date d’admission"
-                    value={data.dateAdmission}
-                    onValueChange={(value) =>
-                      updateField("dateAdmission", value)
-                    }
-                  />
-                </Field>
-                <Field label="Heure d’admission">
-                  <FrenchTimeInput
-                    value={data.heureAdmission}
-                    onValueChange={(value) =>
-                      updateField("heureAdmission", value)
-                    }
-                  />
-                </Field>
-                <Field label="Date de départ" as="div">
-                  <DatePicker
-                    key={data.dateDepart}
-                    label="Date de départ"
-                    value={data.dateDepart}
-                    min={data.dateAdmission}
-                    minMessage="La date de départ ne peut pas précéder l’admission."
-                    onValueChange={(value) => updateField("dateDepart", value)}
-                  />
-                </Field>
-                <Field label="Heure de départ">
-                  <FrenchTimeInput
-                    key={data.heureDepart}
-                    value={data.heureDepart}
-                    min={departureTimeMin}
-                    onValueChange={(value) => updateField("heureDepart", value)}
-                  />
-                </Field>
-                <Field label="Opérateur funéraire" className="span-2">
-                  <input
-                    list="operateurs-options"
-                    value={data.operateur}
-                    onChange={(e) => updateField("operateur", e.target.value)}
-                    placeholder="Pompes Funèbres Martin"
-                  />
-                  <datalist id="operateurs-options">
-                    {operateurs.map((o, i) => (
-                      <option key={i} value={o.nom} />
-                    ))}
-                  </datalist>
-                </Field>
-                <Field label="Mentions particulières" as="div" className="span-2">
-                  <div className="mentions-list">
-                    <label className="mention-item">
-                      <input
-                        className="prestation-checkbox"
-                        type="checkbox"
-                        checked={data.paiementChequeDepart}
-                        onChange={(e) =>
-                          setData((current) => ({
-                            ...current,
-                            paiementChequeDepart: e.target.checked,
-                          }))
-                        }
-                      />
-                      Paiement par chèque au départ
-                    </label>
-                    <label className="mention-item">
-                      <input
-                        className="prestation-checkbox"
-                        type="checkbox"
-                        checked={data.tresGrand}
-                        onChange={(e) =>
-                          setData((current) => ({
-                            ...current,
-                            tresGrand: e.target.checked,
-                          }))
-                        }
-                      />
-                      Très grand
-                    </label>
-                    <label className="mention-item">
-                      <input
-                        className="prestation-checkbox"
-                        type="checkbox"
-                        checked={data.arriveeNuit}
-                        onChange={(e) =>
-                          setData((current) => ({
-                            ...current,
-                            arriveeNuit: e.target.checked,
-                          }))
-                        }
-                      />
-                      Arrivée de nuit
-                    </label>
-                  </div>
-                </Field>
-              </div>
-            </section>
-            <section className="form-card" id="prestations">
-              <div className="card-heading">
-                <div>
-                  <h2>Prestations</h2>
-                  <p>Choisissez les prestations à intégrer au devis</p>
+            <div className="rubrique-tabs" role="tablist">
+              {rubriqueLabels.map((label, index) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeRubrique === index}
+                  className={`rubrique-tab ${activeRubrique === index ? "active" : ""}`}
+                  onClick={() => setActiveRubrique(index)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="rubrique-viewport">
+              <div
+                className="rubrique-track"
+                style={{ transform: `translateX(-${activeRubrique * 100}%)` }}
+              >
+                <div className="rubrique-panel">
+                  <section className="form-card">
+                    <Heading
+                      title="Informations du défunt"
+                      subtitle="Identité, décès et mensurations"
+                    />
+                    <div className="form-grid">
+                      <Field label="Civilité">
+                        <select
+                          value={data.civilite}
+                          onChange={(e) =>
+                            updateField("civilite", e.target.value)
+                          }
+                        >
+                          <option>M</option>
+                          <option>Mme</option>
+                        </select>
+                      </Field>
+                      <Field label="Nom" required>
+                        <input
+                          value={data.nom}
+                          onChange={(e) =>
+                            updateField("nom", e.target.value.toUpperCase())
+                          }
+                          placeholder="DUPONT"
+                          required
+                        />
+                      </Field>
+                      <Field label="Prénom" required>
+                        <input
+                          value={data.prenom}
+                          onChange={(e) =>
+                            updateField("prenom", e.target.value)
+                          }
+                          placeholder="Jean"
+                          required
+                        />
+                      </Field>
+                      <Field label="Nom de naissance">
+                        <input
+                          value={data.nomNaissance}
+                          onChange={(e) =>
+                            updateField("nomNaissance", e.target.value)
+                          }
+                          placeholder="Facultatif"
+                        />
+                      </Field>
+                      <Field label="Date de naissance" as="div">
+                        <DatePicker
+                          label="Date de naissance"
+                          value={data.dateNaissance}
+                          max={todayISO()}
+                          onValueChange={(value) =>
+                            updateField("dateNaissance", value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Date de décès" as="div">
+                        <DatePicker
+                          key={data.dateDeces}
+                          label="Date de décès"
+                          value={data.dateDeces}
+                          min={data.dateNaissance}
+                          minMessage="La date de décès ne peut pas précéder la naissance."
+                          max={todayISO()}
+                          maxMessage="La date de décès ne peut pas être dans le futur."
+                          onValueChange={(value) =>
+                            updateField("dateDeces", value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Heure de décès">
+                        <FrenchTimeInput
+                          value={data.heureDeces}
+                          onValueChange={(value) =>
+                            updateField("heureDeces", value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Code postal">
+                        <input
+                          inputMode="numeric"
+                          value={data.codePostal}
+                          onChange={(e) =>
+                            updateField("codePostal", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Ville du décès">
+                        <input
+                          list="villes-options"
+                          value={data.villeDeces}
+                          onChange={(e) =>
+                            updateField("villeDeces", e.target.value)
+                          }
+                        />
+                        <datalist id="villes-options">
+                          {villeSuggestions.map((ville) => (
+                            <option key={ville} value={ville} />
+                          ))}
+                        </datalist>
+                      </Field>
+                    </div>
+                    <div className="subsection-label">
+                      Mensurations{" "}
+                      <span>Ces informations sont facultatives.</span>
+                    </div>
+                    <div className="form-grid measurement-grid">
+                      <Field label="Taille (cm)">
+                        <input
+                          inputMode="numeric"
+                          value={data.tailleDefunt}
+                          onChange={(e) =>
+                            updateField("tailleDefunt", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Épaulement (cm)">
+                        <input
+                          inputMode="numeric"
+                          value={data.epaulement}
+                          onChange={(e) =>
+                            updateField("epaulement", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Coude à coude (cm)">
+                        <input
+                          inputMode="numeric"
+                          value={data.coudeACoude}
+                          onChange={(e) =>
+                            updateField("coudeACoude", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Épaisseur (cm)">
+                        <input
+                          inputMode="numeric"
+                          value={data.epaisseur}
+                          onChange={(e) =>
+                            updateField("epaisseur", e.target.value)
+                          }
+                        />
+                      </Field>
+                    </div>
+                  </section>
                 </div>
-                <div className="selection-count">
-                  {selectedCount} sélectionnée{selectedCount > 1 ? "s" : ""}
+                <div className="rubrique-panel">
+                  <section className="form-card">
+                    <Heading
+                      title="Séjour & opérateur"
+                      subtitle="Dates de prise en charge et coordonnées"
+                    />
+                    <div className="form-grid">
+                      <Field label="Date d’admission" as="div">
+                        <DatePicker
+                          label="Date d’admission"
+                          value={data.dateAdmission}
+                          onValueChange={(value) =>
+                            updateField("dateAdmission", value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Heure d’admission">
+                        <FrenchTimeInput
+                          value={data.heureAdmission}
+                          onValueChange={(value) =>
+                            updateField("heureAdmission", value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Date de départ" as="div">
+                        <DatePicker
+                          key={data.dateDepart}
+                          label="Date de départ"
+                          value={data.dateDepart}
+                          min={data.dateAdmission}
+                          minMessage="La date de départ ne peut pas précéder l’admission."
+                          onValueChange={(value) =>
+                            updateField("dateDepart", value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Heure de départ">
+                        <FrenchTimeInput
+                          key={data.heureDepart}
+                          value={data.heureDepart}
+                          min={departureTimeMin}
+                          onValueChange={(value) =>
+                            updateField("heureDepart", value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Opérateur funéraire" className="span-2">
+                        <input
+                          list="operateurs-options"
+                          value={data.operateur}
+                          onChange={(e) =>
+                            updateField("operateur", e.target.value)
+                          }
+                          placeholder="Pompes Funèbres Martin"
+                        />
+                        <datalist id="operateurs-options">
+                          {operateurs.map((o, i) => (
+                            <option key={i} value={o.nom} />
+                          ))}
+                        </datalist>
+                      </Field>
+                      <Field
+                        label="Mentions particulières"
+                        as="div"
+                        className="span-2"
+                      >
+                        <div className="mentions-list">
+                          <label className="mention-item">
+                            <input
+                              className="prestation-checkbox"
+                              type="checkbox"
+                              checked={data.paiementChequeDepart}
+                              onChange={(e) =>
+                                setData((current) => ({
+                                  ...current,
+                                  paiementChequeDepart: e.target.checked,
+                                }))
+                              }
+                            />
+                            Paiement par chèque au départ
+                          </label>
+                          <label className="mention-item">
+                            <input
+                              className="prestation-checkbox"
+                              type="checkbox"
+                              checked={data.tresGrand}
+                              onChange={(e) =>
+                                setData((current) => ({
+                                  ...current,
+                                  tresGrand: e.target.checked,
+                                }))
+                              }
+                            />
+                            Très grand
+                          </label>
+                          <label className="mention-item">
+                            <input
+                              className="prestation-checkbox"
+                              type="checkbox"
+                              checked={data.arriveeNuit}
+                              onChange={(e) =>
+                                setData((current) => ({
+                                  ...current,
+                                  arriveeNuit: e.target.checked,
+                                }))
+                              }
+                            />
+                            Arrivée de nuit
+                          </label>
+                        </div>
+                      </Field>
+                    </div>
+                  </section>
                 </div>
-              </div>
-              {isLoadingPrestations ? (
-                <div className="loading">Chargement des prestations…</div>
-              ) : prestations.length ? (
-                <div className="prestations-list">
-                  {prestations.map((p) => (
-                    <label className="prestation-row" key={p.Code}>
-                      <input
-                        className="prestation-checkbox"
-                        type="checkbox"
-                        checked={Boolean(selectedPrestations[p.Code])}
-                        onChange={() => togglePrestation(p.Code)}
-                        aria-label={"Sélectionner " + p.Libelle}
-                      />
-                      <div className="prestation-info">
-                        <strong>{p.Libelle}</strong>
-                        <small>{p.Code}</small>
+                <div className="rubrique-panel">
+                  <section className="form-card" id="prestations">
+                    <div className="card-heading">
+                      <div>
+                        <h2>Prestations</h2>
+                        <p>Choisissez les prestations à intégrer au devis</p>
                       </div>
-                      <div className="prestation-price">
-                        {p.PrixTTC.toLocaleString("fr-FR", {
-                          style: "currency",
-                          currency: "EUR",
-                        })}{" "}
-                        <span>TTC</span>
+                      <div className="selection-count">
+                        {selectedCount} sélectionnée
+                        {selectedCount > 1 ? "s" : ""}
                       </div>
-                    </label>
-                  ))}
+                    </div>
+                    {isLoadingPrestations ? (
+                      <div className="loading">Chargement des prestations…</div>
+                    ) : prestations.length ? (
+                      <div className="prestations-list">
+                        {prestations.map((p) => (
+                          <label className="prestation-row" key={p.Code}>
+                            <input
+                              className="prestation-checkbox"
+                              type="checkbox"
+                              checked={Boolean(selectedPrestations[p.Code])}
+                              onChange={() => togglePrestation(p.Code)}
+                              aria-label={"Sélectionner " + p.Libelle}
+                            />
+                            <div className="prestation-info">
+                              <strong>{p.Libelle}</strong>
+                              <small>{p.Code}</small>
+                            </div>
+                            <div className="prestation-price">
+                              {p.PrixTTC.toLocaleString("fr-FR", {
+                                style: "currency",
+                                currency: "EUR",
+                              })}{" "}
+                              <span>TTC</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        Aucune prestation disponible.
+                      </div>
+                    )}
+                  </section>
                 </div>
-              ) : (
-                <div className="empty-state">Aucune prestation disponible.</div>
-              )}
-            </section>
+              </div>
+            </div>
             {status && (
               <div className={`status ${status.type}`} role="status">
                 {status.message}
@@ -847,8 +923,10 @@ function DatePicker({
   // Returns "" when parsed satisfies min/max, otherwise the message to show.
   const validityMessage = (parsed: string) => {
     if (!parsed) return "Date invalide.";
-    if (min && parsed < min) return minMessage ?? "Cette date est trop ancienne.";
-    if (max && parsed > max) return maxMessage ?? "Cette date est trop récente.";
+    if (min && parsed < min)
+      return minMessage ?? "Cette date est trop ancienne.";
+    if (max && parsed > max)
+      return maxMessage ?? "Cette date est trop récente.";
     return "";
   };
 
@@ -936,13 +1014,21 @@ function DatePicker({
           aria-label={`Calendrier — ${label}`}
         >
           <div className="date-picker-header">
-            <button type="button" onClick={() => changeMonth(-1)} aria-label="Mois précédent">
+            <button
+              type="button"
+              onClick={() => changeMonth(-1)}
+              aria-label="Mois précédent"
+            >
               ‹
             </button>
             <span>
               {MONTH_LABELS[viewMonth]} {viewYear}
             </span>
-            <button type="button" onClick={() => changeMonth(1)} aria-label="Mois suivant">
+            <button
+              type="button"
+              onClick={() => changeMonth(1)}
+              aria-label="Mois suivant"
+            >
               ›
             </button>
           </div>
@@ -954,7 +1040,9 @@ function DatePicker({
           <div className="date-picker-days">
             {days.map(({ date, inMonth }) => {
               const iso = toISODate(date);
-              const disabled = Boolean((min && iso < min) || (max && iso > max));
+              const disabled = Boolean(
+                (min && iso < min) || (max && iso > max),
+              );
               const classNames = [
                 !inMonth && "outside",
                 iso === value && "selected",
