@@ -586,7 +586,7 @@ export default function Home() {
                       <Field
                         label="Information en plus"
                         as="div"
-                        className="span-2"
+                        className="span-4"
                       >
                         <div className="mentions-list">
                           <label className="mention-item">

@@ -300,6 +300,9 @@ select {
 .span-2 {
   grid-column: span 2;
 }
+.span-4 {
+  grid-column: 1 / -1;
+}
 .prestations-list {
   display: grid;
   border: 1px solid var(--line);
