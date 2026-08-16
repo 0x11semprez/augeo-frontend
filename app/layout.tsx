@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mont Valérien — Nouveau devis",
+  title: "MF Nanterre",
   description: "Génération de devis funéraires",
 };
 

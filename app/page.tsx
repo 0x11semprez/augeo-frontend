@@ -67,6 +67,8 @@ const todayISO = () => {
   const now = new Date();
   return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
 };
+const sanitizeFileNamePart = (value: string) =>
+  value.replace(/[^a-zA-Z0-9]/g, "_") || "devis";
 
 export default function Home() {
   const [data, setData] = useState<FormData>(initialData);
@@ -285,7 +287,9 @@ export default function Home() {
         throw new Error(payload?.error ?? "La génération du devis a échoué.");
       }
       const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      const fileName = `devis_${sanitizeFileNamePart(data.nom)}_${sanitizeFileNamePart(data.prenom)}.pdf`;
+      const file = new File([blob], fileName, { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(file);
       if (pdfWindow) pdfWindow.location.href = blobUrl;
       // Revoke once the new tab has had time to load the PDF, to avoid leaking the blob.
       setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
