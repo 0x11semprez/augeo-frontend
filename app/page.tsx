@@ -580,7 +580,7 @@ export default function Home() {
                         </datalist>
                       </Field>
                       <Field
-                        label="Mentions particulières"
+                        label="Information en plus"
                         as="div"
                         className="span-2"
                       >
