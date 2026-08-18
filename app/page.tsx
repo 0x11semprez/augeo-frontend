@@ -200,7 +200,7 @@ export default function Home() {
   const handleOuvrirOutlook = () => {
     const subject = encodeURIComponent(buildDevisLabel());
     const body = encodeURIComponent(
-      "Bonjour,\n\nVeuillez trouver le devis en pièce jointe.\n\nCordialement,",
+      " Bonjour,\n\nCi-joint le bon de commande pour le convoi.\n\nMerci de nous le renvoyer avec votre signature et votre tampon lisible.\n\nAinsi que le numéro hommage Agence (zone sous le tampon)\n\nRappel :\n\nTout convoi dont nous n’aurons pas le bon de commande signé et tamponné à l’heure du départ sera bloqué dans l'attente du document validé.\n\nCordialement,",
     );
     const to = encodeURIComponent(selectedOperateur?.email ?? "");
     window.open(
