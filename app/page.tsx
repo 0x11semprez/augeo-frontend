@@ -302,24 +302,31 @@ export default function Home() {
       }
       const blob = await response.blob();
       const fileName = `devis_${sanitizeFileNamePart(data.nom)}_${sanitizeFileNamePart(data.prenom)}.pdf`;
-      const file = new File([blob], fileName, { type: "application/pdf" });
-      const blobUrl = URL.createObjectURL(file);
-      if (pdfWindow) pdfWindow.location.href = blobUrl;
-      // Navigating a window to a blob: URL only opens a preview — it doesn't
-      // trigger a download and the browser forgets the intended file name if
-      // the user later does "Save As". An <a download> click is what
-      // actually triggers a real, named download.
+      // Two separate object URLs: sharing a single blob: URL between the
+      // preview tab and the <a download> anchor makes browsers hijack the
+      // download and just reopen the PDF viewer instead (e.g. Firefox
+      // bug 1766420), which is also why the "Save As" name then falls back
+      // to a random blob id instead of the intended file name.
+      const downloadUrl = URL.createObjectURL(
+        new File([blob], fileName, { type: "application/pdf" }),
+      );
       const downloadLink = document.createElement("a");
-      downloadLink.href = blobUrl;
+      downloadLink.href = downloadUrl;
       downloadLink.download = fileName;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       downloadLink.remove();
-      // Revoke once the new tab has had time to load the PDF, to avoid leaking the blob.
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+      const previewUrl = URL.createObjectURL(blob);
+      if (pdfWindow) pdfWindow.location.href = previewUrl;
+      // Revoke once the new tab has had time to load the PDF, to avoid leaking the blobs.
+      setTimeout(() => {
+        URL.revokeObjectURL(downloadUrl);
+        URL.revokeObjectURL(previewUrl);
+      }, 60_000);
       setStatus({
         type: "success",
-        message: "Le devis a été généré, téléchargé et ouvert dans une nouvelle fenêtre.",
+        message:
+          "Le devis a été généré, téléchargé et ouvert dans une nouvelle fenêtre.",
       });
       return true;
     } catch (error) {
