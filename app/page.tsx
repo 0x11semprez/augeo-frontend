@@ -198,15 +198,29 @@ export default function Home() {
   );
 
   const handleOuvrirOutlook = () => {
-    const subject = encodeURIComponent(buildDevisLabel());
-    const body = encodeURIComponent(
-      " Bonjour,\n\nCi-joint le bon de commande pour le convoi.\n\nMerci de nous le renvoyer avec votre signature et votre tampon lisible.\n\nAinsi que le numéro hommage Agence (zone sous le tampon)\n\nRappel :\n\nTout convoi dont nous n’aurons pas le bon de commande signé et tamponné à l’heure du départ sera bloqué dans l'attente du document validé.\n\nCordialement,",
+    const subject = buildDevisLabel();
+    const body =
+      " Bonjour,\n\nCi-joint le bon de commande pour le convoi.\n\nMerci de nous le renvoyer avec votre signature et votre tampon lisible.\n\nAinsi que le numéro hommage Agence (zone sous le tampon)\n\nRappel :\n\nTout convoi dont nous n’aurons pas le bon de commande signé et tamponné à l’heure du départ sera bloqué dans l'attente du document validé.\n\nCordialement,";
+    const to = selectedOperateur?.email ?? "";
+
+    // Outlook Web double-encodes the deeplink when redirecting through login,
+    // turning %20 into "+" and mangling the body. Building the redirect URL
+    // ourselves keeps the encoding intact whether the user is logged in or not.
+    const targetURL = new URL(
+      "https://outlook.office.com/mail/deeplink/compose/",
     );
-    const to = encodeURIComponent(selectedOperateur?.email ?? "");
-    window.open(
-      `https://outlook.office.com/mail/deeplink/compose?to=${to}&subject=${subject}&body=${body}`,
-      "_blank",
+    if (to) targetURL.searchParams.set("to", to);
+    targetURL.searchParams.set("subject", subject);
+    targetURL.searchParams.set("body", body);
+    targetURL.search = targetURL.search.replaceAll("+", "%20");
+
+    const redirectURL = new URL("https://outlook.office.com/owa/?state=1");
+    redirectURL.searchParams.set(
+      "redirectTo",
+      btoa(targetURL.toString()).replaceAll("=", ""),
     );
+
+    window.open(redirectURL.toString(), "_blank");
     setStatus({
       type: "success",
       message: selectedOperateur?.email
@@ -291,11 +305,21 @@ export default function Home() {
       const file = new File([blob], fileName, { type: "application/pdf" });
       const blobUrl = URL.createObjectURL(file);
       if (pdfWindow) pdfWindow.location.href = blobUrl;
+      // Navigating a window to a blob: URL only opens a preview — it doesn't
+      // trigger a download and the browser forgets the intended file name if
+      // the user later does "Save As". An <a download> click is what
+      // actually triggers a real, named download.
+      const downloadLink = document.createElement("a");
+      downloadLink.href = blobUrl;
+      downloadLink.download = fileName;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
       // Revoke once the new tab has had time to load the PDF, to avoid leaking the blob.
       setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
       setStatus({
         type: "success",
-        message: "Le devis a été généré et ouvert dans une nouvelle fenêtre.",
+        message: "Le devis a été généré, téléchargé et ouvert dans une nouvelle fenêtre.",
       });
       return true;
     } catch (error) {
